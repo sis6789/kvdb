@@ -1,7 +1,6 @@
 package kvdb
 
 // wrapper for badger key-value db
-// refer https://dgraph.io/docs/badger/
 
 import (
 	"github.com/dgraph-io/badger/v3"
