@@ -1,11 +1,11 @@
 package kvdb
 
-// wrapper for badger key-value db
-
 import (
 	"github.com/dgraph-io/badger/v3"
 	"log"
 )
+
+// wrapper for badger key-value db
 
 type Iter struct {
 	iter   *badger.Iterator

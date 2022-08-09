@@ -3,12 +3,9 @@ package kvdb
 // wrapper for badger key-value db
 
 import (
+	"errors"
 	"github.com/dgraph-io/badger/v3"
 	"log"
-)
-
-import (
-	"errors"
 	"strconv"
 )
 
