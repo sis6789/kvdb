@@ -1,4 +1,4 @@
-module kvdb
+module github.com/sis6789/kvdb
 
 go 1.19
 
