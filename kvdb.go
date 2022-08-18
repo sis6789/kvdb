@@ -64,6 +64,30 @@ func (x *KVDB) Set(k string, v string) error {
 	return err
 }
 
+func (x *KVDB) Append(k string, v string) error {
+
+	err := x.db.Update(func(txn *badger.Txn) error {
+		var err error
+		kb := []byte(k)
+		vb := []byte(v)
+		item, err := txn.Get(kb)
+		if err != nil {
+			err = txn.Set(kb, vb)
+		} else {
+			var oldValue []byte
+			oldValue, err = item.ValueCopy(nil)
+			if err != nil {
+				log.Printf("%v", err)
+			}
+			oldValue = append(oldValue, vb)
+			err = txn.Set(kb, oldValue)
+		}
+		return err
+	})
+
+	return err
+}
+
 func (x *KVDB) SetInt(k string, v int) error {
 	return x.Set(k, strconv.Itoa(v))
 }
