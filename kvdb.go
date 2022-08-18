@@ -4,15 +4,15 @@ package kvdb
 
 import (
 	"errors"
-	"github.com/dgraph-io/badger/v3"
 	"log"
 	"strconv"
+
+	"github.com/dgraph-io/badger/v3"
 )
 
 type KVDB struct {
-	db        *badger.DB
-	dbPath    string
-	updateTxn *badger.Txn
+	db     *badger.DB
+	dbPath string
 }
 
 func (x *KVDB) DB() *badger.DB {
@@ -34,8 +34,6 @@ func (x *KVDB) Open(path string) error {
 	}
 	log.Printf("kvdb at %v", x.dbPath)
 
-	x.updateTxn = x.db.NewTransaction(true)
-
 	return nil
 }
 
@@ -44,13 +42,7 @@ func (x *KVDB) Close() error {
 		log.Printf("no db")
 		return errors.New("no db")
 	}
-	var err error
-	if err = x.updateTxn.Commit(); err != nil {
-		log.Printf("%v", err)
-		return err
-	}
-	x.updateTxn.Discard()
-	err = x.db.Close()
+	err := x.db.Close()
 	if err != nil {
 		log.Printf("%v", err)
 		return err
@@ -61,25 +53,31 @@ func (x *KVDB) Close() error {
 }
 
 func (x *KVDB) Set(k string, v string) error {
-	if x.updateTxn == nil {
-		log.Printf("no transaction")
-		return errors.New("no transaction")
-	}
-	kb := []byte(k)
-	vb := []byte(v)
-	err := x.updateTxn.Set(kb, vb)
-	switch err {
-	case badger.ErrTxnTooBig:
-		if err = x.updateTxn.Commit(); err != nil {
-			log.Printf("%v", err)
+
+	err := x.db.Update(func(txn *badger.Txn) error {
+		kb := []byte(k)
+		vb := []byte(v)
+		err := txn.Set(kb, vb)
+		switch err {
+		case badger.ErrTxnTooBig:
+			if err = txn.Commit(); err != nil {
+				log.Printf("%v", err)
+			}
+			txn.Discard()
+			txn = x.db.NewTransaction(true)
+			return x.Set(k, v)
+		case badger.ErrDiscardedTxn:
+			txn = x.db.NewTransaction(true)
+			return x.Set(k, v)
+		default:
+			err = txn.Commit()
+			if err != nil {
+				log.Printf("%v", err)
+			}
 		}
-		x.updateTxn.Discard()
-		x.updateTxn = x.db.NewTransaction(true)
-		return x.Set(k, v)
-	case badger.ErrDiscardedTxn:
-		x.updateTxn = x.db.NewTransaction(true)
-		return x.Set(k, v)
-	}
+		return err
+	})
+
 	return err
 }
 
@@ -97,27 +95,33 @@ func (x *KVDB) GetInt(k string) (int, error) {
 }
 
 func (x *KVDB) Get(k string) (string, error) {
-	if x.updateTxn == nil {
-		log.Printf("no transaction")
-		return "", errors.New("no transaction")
-	}
-	kb := []byte(k)
-	item, err := x.updateTxn.Get(kb)
-	switch err {
-	case badger.ErrKeyNotFound:
-		return "", err
-	case badger.ErrDiscardedTxn:
-		x.updateTxn = x.db.NewTransaction(true)
-		return x.Get(k)
-	case nil:
-		var vb []byte
-		vb, err = item.ValueCopy(vb)
-		if err != nil {
+	readString := ""
+	err := x.db.View(func(txn *badger.Txn) error {
+		kb := []byte(k)
+		item, err := txn.Get(kb)
+		switch err {
+		case badger.ErrKeyNotFound:
+			return err
+		case badger.ErrDiscardedTxn:
+			txn = x.db.NewTransaction(true)
+			v, err := x.Get(k)
+			if err == nil {
+				readString = v
+			}
+			return err
+		case nil:
+			var vb []byte
+			vb, err = item.ValueCopy(vb)
+			if err != nil {
+				log.Printf("%v", err)
+			} else {
+				readString = string(vb)
+			}
+			return err
+		default:
 			log.Printf("%v", err)
+			return err
 		}
-		return string(vb), err
-	default:
-		log.Printf("%v", err)
-		return "", err
-	}
+	})
+	return readString, err
 }
