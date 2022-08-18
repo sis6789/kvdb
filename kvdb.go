@@ -79,7 +79,7 @@ func (x *KVDB) Append(k string, v string) error {
 			if err != nil {
 				log.Printf("%v", err)
 			}
-			oldValue = append(oldValue, vb)
+			oldValue = append(oldValue, vb...)
 			err = txn.Set(kb, oldValue)
 		}
 		return err
