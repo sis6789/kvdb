@@ -73,6 +73,9 @@ func (x *KVDB) Append(k string, v string) error {
 		item, err := txn.Get(kb)
 		if err != nil {
 			err = txn.Set(kb, vb)
+			if err != nil {
+				log.Printf("%v", err)
+			}
 		} else {
 			var oldValue []byte
 			oldValue, err = item.ValueCopy(nil)
